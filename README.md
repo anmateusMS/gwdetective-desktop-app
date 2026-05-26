@@ -16,11 +16,8 @@ and performance counters — without uploading anything anywhere.
 
 - Open an On-premises Data Gateway support `.zip` via the **Open Zip File**
   button or drag-and-drop.
-- Two parse modes:
-  - **Basic** (default) — errors + info logs only; skips heavy CSV /
-    performance / mashup files. Snappy on huge bundles.
-  - **Full** — all logs, query reports, performance aggregations, and
-    Power Platform attribution.
+- Always parses everything: all logs, query reports, performance
+  aggregations, and Power Platform attribution.
 - Session cache: optionally reopen the most recently parsed bundle on
   next launch.
 - Streaming parser handles multi-GB bundles without loading the whole

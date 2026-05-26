@@ -1115,16 +1115,6 @@ body {
       </div>
     </div>
 
-    <div style="margin-top:32px; display:flex; align-items:center; gap:12px; justify-content:center;">
-      <span style="font-size:13px; color:var(--cp-text-muted); cursor:help;" title="Only Errors and Info logs">Basic</span>
-      <div style="position:relative; width:42px; height:16px; background:#ffffff; border-radius:8px; cursor:pointer; transition:background 0.3s;" id="mode-switch" onclick="toggleMode()">
-        <div id="switch-thumb" style="position:absolute; top:2px; left:2px; width:12px; height:12px; background:var(--cp-bg); border-radius:6px; transition:left 0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
-      </div>
-      <span style="font-size:13px; color:var(--cp-text-muted); cursor:help;" title="All logs">Full</span>
-    </div>
-
-
-
     <div class="drop-footer">
       <div class="drop-privacy">
         <svg class="privacy-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -1862,7 +1852,7 @@ function buildAttributionIndex(rows) {
 self.onmessage = async (e) => {
   const msg = e.data || {};
   if (msg.type !== 'parse') return;
-  const { buffer, isBasic } = msg;
+  const { buffer } = msg;
   _idSeq = 0;
 
   const result = {
@@ -1882,24 +1872,18 @@ self.onmessage = async (e) => {
   try {
     self.postMessage({ type: 'progress', message: 'Opening zip…' });
 
-    // Decide up-front which entries are worth decompressing. In Basic mode
-    // we drop the heavy CSV/perf files and any log not destined for the
-    // Errors/Info tabs — fflate's filter runs before inflation so these
-    // bytes never enter memory as a Uint8Array.
+    // Decide up-front which entries are worth decompressing. fflate's
+    // filter runs before inflation so unwanted bytes never enter memory
+    // as a Uint8Array.
     const wantEntry = (name) => {
       const base = name.split('/').pop();
       if (!base) return false;
       if (isQueryExecCsv(base) || isQueryStartCsv(base) || isPerfReport(base)) {
-        if (isBasic) { result.ingestStats.skippedFiles++; return false; }
         return true;
       }
       if (isRawFile(base)) return true;
       const tab = getEntryTab(base);
-      if (isBasic && !['errors', 'info'].includes(tab)) {
-        result.ingestStats.skippedFiles++;
-        return false;
-      }
-      return true;
+      return !!tab;
     };
 
     const files = await new Promise((resolve, reject) => {
@@ -1949,7 +1933,7 @@ self.onmessage = async (e) => {
       }
 
       parseLogFileMultiLine(text, name, tab, (entry) => {
-        if (!isBasic && result.allEntries.length >= MAX_LOG_ENTRIES_TOTAL) {
+        if (result.allEntries.length >= MAX_LOG_ENTRIES_TOTAL) {
           result.ingestStats.droppedLogs++;
           return;
         }
@@ -2000,7 +1984,6 @@ const state = {
   chart:        null,
   activeTab:    'dashboard',
   corrFilter:   null, // lowercase UUID string | null
-  isBasicMode:  true  // true = basic, false = full
 };
 state.queryExecRows    = [];
 state.queryExecFiltered = [];
@@ -2023,36 +2006,7 @@ const MAX_LOG_ENTRIES_TOTAL = 180000;
 const MAX_QUERY_EXEC_ROWS = 120000;
 const MAX_QUERY_START_ROWS = 120000;
 const MAX_PERF_ROWS_PER_TYPE = 120000;
-const MODE_KEY = 'gwTracerMode';
 const HARD_MAX_ZIP_BYTES = 700 * 1024 * 1024;
-
-function isBasicMode() {
-  return state.isBasicMode === true;
-}
-
-function setMode(isBasic) {
-  state.isBasicMode = isBasic;
-  try { localStorage.setItem(MODE_KEY, isBasic ? 'basic' : 'full'); } catch {}
-  const switchEl = document.getElementById('mode-switch');
-  const thumb = document.getElementById('switch-thumb');
-  if (switchEl && thumb) {
-    if (isBasic) {
-      thumb.style.left = '2px';
-    } else {
-      thumb.style.left = '28px';
-    }
-  }
-}
-
-function toggleMode() {
-  setMode(!state.isBasicMode);
-}
-
-function initMode() {
-  let saved = 'basic';
-  try { saved = localStorage.getItem(MODE_KEY) || 'basic'; } catch {}
-  setMode(saved === 'basic');
-}
 
 // ── File → tab mapping ───────────────────────────────────────────────────────
 function getEntryTab(name) {
@@ -2796,7 +2750,6 @@ function bumpFileCount() {
   paintCounters();
 }
 bumpVisitOnce();
-initMode();
 
 // ── IndexedDB session cache ──────────────────────────────────────────────────
 // Single-slot cache: only ever stores the most recently parsed file.
@@ -2860,7 +2813,7 @@ async function refreshRecentSessionPanel() {
   const ago = entry.savedAt ? new Date(entry.savedAt).toLocaleString() : '';
   const sz  = _fmtBytes(entry.meta.fileSize);
   document.getElementById('recent-meta').textContent =
-    [sz, ago && '· ' + ago, entry.meta.isBasic ? '· Basic' : '· Full'].filter(Boolean).join(' ');
+    [sz, ago && '· ' + ago].filter(Boolean).join(' ');
   panel.style.display = 'flex';
 }
 async function reopenCachedSession() {
@@ -2872,8 +2825,6 @@ async function reopenCachedSession() {
   }
   setLoading(true, 'Restoring cached session…');
   try {
-    // Restore the saved mode flag so the UI reflects how the data was parsed.
-    if (typeof entry.meta.isBasic === 'boolean') setMode(entry.meta.isBasic);
     applyParseResult(entry.result);
   } catch (err) {
     alert('Could not restore cached session:\n' + err.message);
@@ -2927,7 +2878,7 @@ async function loadZip(file) {
           // Overwrite any previous cache — single-slot, so loading a new file
           // effectively clears the previous one.
           saveCachedSession(
-            { fileName: file.name, fileSize: file.size, isBasic: isBasicMode() },
+            { fileName: file.name, fileSize: file.size },
             m.result
           );
         }
@@ -2936,7 +2887,7 @@ async function loadZip(file) {
       }
     };
     // Transfer the ArrayBuffer to avoid copying — the main thread no longer needs it.
-    worker.postMessage({ type: 'parse', buffer: buf, isBasic: isBasicMode() }, [buf]);
+    worker.postMessage({ type: 'parse', buffer: buf }, [buf]);
   });
 }
 
@@ -2982,9 +2933,9 @@ function applyParseResult(r) {
   buildUI();
   const st = state.ingestStats || {};
   const dropped = (st.droppedLogs || 0) + (st.droppedQueryExec || 0) + (st.droppedQueryStart || 0) + (st.droppedPerf || 0);
-  if (isBasicMode() && (dropped > 0 || (st.skippedFiles || 0) > 0)) {
+  if (dropped > 0 || (st.skippedFiles || 0) > 0) {
     alert(
-      `Loaded in ${state.isBasicMode ? 'Basic' : 'Full'} mode. Some rows were skipped to prevent browser crashes:\n\n`
+      `Some rows were skipped because the dataset exceeded the built-in safety limits:\n\n`
       + `Log events: ${fmtN(st.droppedLogs || 0)}\n`
       + `QueryExecution rows: ${fmtN(st.droppedQueryExec || 0)}\n`
       + `QueryStart rows: ${fmtN(st.droppedQueryStart || 0)}\n`

@@ -113,7 +113,7 @@
   // File/Blob with no path, so those keep using the original loadZip.
   //
   // The bridge dispatches a sequence of events:
-  //   parse-meta    { isBasic, fileName, fileSize }
+  //   parse-meta    { fileName, fileSize }
   //   parse-progress{ message }
   //   parse-batch   { kind: 'log'|'queryExec'|'queryStart'|'perf'|'rawFile'|'gwInfo'|'modules', ... }
   //   parse-done    { ingestStats, queryMaxDur }
@@ -176,7 +176,6 @@
       case 'parse-meta':
         _activeParse.fileName = payload.fileName;
         _activeParse.fileSize = payload.fileSize;
-        _activeParse.isBasic  = payload.isBasic;
         break;
 
       case 'parse-progress':
@@ -241,7 +240,7 @@
           if (typeof bumpFileCount === 'function') bumpFileCount();
           if (typeof saveCachedSession === 'function') {
             saveCachedSession(
-              { fileName: _activeParse.fileName, fileSize: _activeParse.fileSize, isBasic: _activeParse.isBasic },
+              { fileName: _activeParse.fileName, fileSize: _activeParse.fileSize },
               r
             );
           }
@@ -268,17 +267,17 @@
   }
 
   /** Asks the host to parse a zip file at the given path and stream results. */
-  function parseZipPath(path, isBasic) {
+  function parseZipPath(path) {
     if (_activeParse) {
       alert('Another parse is already running.');
       return Promise.resolve();
     }
     if (typeof setLoading === 'function') setLoading(true, 'Opening zip…');
     return new Promise((resolve) => {
-      _activeParse = { result: emptyResult(), resolve, isBasic };
+      _activeParse = { result: emptyResult(), resolve };
       const id = String(++_seq);
       _pending.set(id, () => {/* events flow via dedicated handler */});
-      window.chrome.webview.postMessage(JSON.stringify({ cmd: 'parse-zip', id, path, isBasic: !!isBasic }));
+      window.chrome.webview.postMessage(JSON.stringify({ cmd: 'parse-zip', id, path }));
       // Re-route this id's messages into the streaming handler.
       _streamingIds.add(id);
     });
@@ -289,8 +288,7 @@
   pickAndLoad = async function () {
     const r = await callHost('pick-zip');
     if (!r || !r.ok) return;
-    const basic = (typeof isBasicMode === 'function') ? isBasicMode() : true;
-    await parseZipPath(r.path, basic);
+    await parseZipPath(r.path);
   };
   window.__gtPickAndLoad = pickAndLoad;
 

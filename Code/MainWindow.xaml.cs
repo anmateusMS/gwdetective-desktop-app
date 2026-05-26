@@ -212,8 +212,7 @@ public partial class MainWindow : Window
                     break;
                 case "parse-zip":
                     var path    = root.TryGetProperty("path",    out var pEl) ? pEl.GetString() : null;
-                    var isBasic = root.TryGetProperty("isBasic", out var bEl) && bEl.GetBoolean();
-                    await HandleParseZipAsync(id, path, isBasic);
+                    await HandleParseZipAsync(id, path);
                     break;
                 case "update-probe":
                     await HandleUpdateProbeAsync(id);
@@ -310,7 +309,7 @@ public partial class MainWindow : Window
     /// any large in-memory result object that would re-trigger the same
     /// OOM we hit in the browser.
     /// </summary>
-    private async Task HandleParseZipAsync(string? id, string? path, bool isBasic)
+    private async Task HandleParseZipAsync(string? id, string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
@@ -322,7 +321,7 @@ public partial class MainWindow : Window
         {
             // Acknowledge the request immediately so the renderer can wire
             // its accumulator and show progress UI.
-            await SendParseEventAsync(id, new { ev = "parse-meta", isBasic, fileName = Path.GetFileName(path), fileSize = new FileInfo(path).Length });
+            await SendParseEventAsync(id, new { ev = "parse-meta", fileName = Path.GetFileName(path), fileSize = new FileInfo(path).Length });
 
             var parser = new GatewayZipParser();
             var sink = new ParserSink
@@ -339,7 +338,7 @@ public partial class MainWindow : Window
             };
 
             // Run the heavy parse off the UI thread.
-            await Task.Run(() => parser.ParseAsync(path, isBasic, sink, CancellationToken.None));
+            await Task.Run(() => parser.ParseAsync(path, sink, CancellationToken.None));
         }
         catch (Exception ex)
         {

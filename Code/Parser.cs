@@ -66,7 +66,7 @@ internal sealed class GatewayZipParser
     private long _idSeq;
     private readonly HashSet<string> _modules = new(StringComparer.Ordinal);
 
-    public async Task ParseAsync(string zipPath, bool isBasic, ParserSink sink, CancellationToken ct)
+    public async Task ParseAsync(string zipPath, ParserSink sink, CancellationToken ct)
     {
         await sink.EmitAsync(new { ev = "parse-progress", message = "Opening zip…" }).ConfigureAwait(false);
 
@@ -91,12 +91,9 @@ internal sealed class GatewayZipParser
             var basename = entry.Name;
             if (IsQueryExecCsv(basename) || IsQueryStartCsv(basename) || IsPerfReport(basename))
             {
-                if (isBasic) { _stats.SkippedFiles++; continue; }
                 entries.Add(entry); continue;
             }
             if (IsRawFile(basename)) { entries.Add(entry); continue; }
-            var tab = GetEntryTab(basename);
-            if (isBasic && tab is not ("errors" or "info")) { _stats.SkippedFiles++; continue; }
             entries.Add(entry);
         }
 
@@ -172,7 +169,7 @@ internal sealed class GatewayZipParser
                 continue;
             }
 
-            await ParseLogTextAsync(text, name, entryTab, isBasic, batchLogs, sink, () => logCount, n => logCount = n).ConfigureAwait(false);
+            await ParseLogTextAsync(text, name, entryTab, batchLogs, sink, () => logCount, n => logCount = n).ConfigureAwait(false);
         }
 
         // Flush any remaining log batches.
@@ -206,7 +203,7 @@ internal sealed class GatewayZipParser
 
     // ── Log text parser ─────────────────────────────────────────────────────
     private async Task ParseLogTextAsync(
-        string text, string filename, string tab, bool isBasic,
+        string text, string filename, string tab,
         Dictionary<string, List<object>> batchLogs, ParserSink sink,
         Func<int> getLogCount, Action<int> setLogCount)
     {
@@ -230,7 +227,7 @@ internal sealed class GatewayZipParser
             if (current.TryGetValue("module", out var mObj) && mObj is string mStr && mStr.Length > 0)
                 _modules.Add(mStr);
 
-            if (!isBasic && getLogCount() >= ParserConstants.MaxLogEntriesTotal)
+            if (getLogCount() >= ParserConstants.MaxLogEntriesTotal)
             {
                 _stats.DroppedLogs++;
             }
