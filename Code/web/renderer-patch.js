@@ -134,7 +134,7 @@
       queryStartRows: [],
       queryMaxDur: 0,
       perf: { counters: [], concurrent: [], queryAgg: [], mashupEval: [], openConn: [] },
-      ingestStats: { droppedLogs: 0, droppedQueryExec: 0, droppedQueryStart: 0, droppedPerf: 0, skippedFiles: 0 },
+      ingestStats: { droppedLogs: 0, droppedQueryExec: 0, droppedQueryStart: 0, droppedPerf: 0 },
       attributionIndex: null,
     };
   }

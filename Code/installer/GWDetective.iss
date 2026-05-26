@@ -21,7 +21,7 @@
 #endif
 
 #define MyAppName      "GW Detective"
-#define MyAppVersion   "0.1.2"
+#define MyAppVersion   "0.1.3"
 #define MyAppPublisher "GW Detective"
 #define MyAppExeName   "GWDetective.exe"
 #define MyAppId        "{{B8E2A2C0-9F7E-4B5D-9F2C-7E3E1A9B0001}"

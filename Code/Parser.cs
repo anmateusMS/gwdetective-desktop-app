@@ -35,7 +35,6 @@ internal sealed record IngestStats
     public int DroppedQueryExec  { get; set; }
     public int DroppedQueryStart { get; set; }
     public int DroppedPerf       { get; set; }
-    public int SkippedFiles      { get; set; }
 }
 
 internal sealed class ParserSink
@@ -195,7 +194,6 @@ internal sealed class GatewayZipParser
                 droppedQueryExec  = _stats.DroppedQueryExec,
                 droppedQueryStart = _stats.DroppedQueryStart,
                 droppedPerf       = _stats.DroppedPerf,
-                skippedFiles      = _stats.SkippedFiles,
             },
             queryMaxDur,
         }).ConfigureAwait(false);

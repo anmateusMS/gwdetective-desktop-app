@@ -1864,7 +1864,7 @@ self.onmessage = async (e) => {
     queryStartRows: [],
     queryMaxDur: 0,
     perf: { counters: [], concurrent: [], queryAgg: [], mashupEval: [], openConn: [] },
-    ingestStats: { droppedLogs: 0, droppedQueryExec: 0, droppedQueryStart: 0, droppedPerf: 0, skippedFiles: 0 },
+    ingestStats: { droppedLogs: 0, droppedQueryExec: 0, droppedQueryStart: 0, droppedPerf: 0 },
     attributionIndex: null,
   };
 
@@ -2932,14 +2932,13 @@ function applyParseResult(r) {
   buildUI();
   const st = state.ingestStats || {};
   const dropped = (st.droppedLogs || 0) + (st.droppedQueryExec || 0) + (st.droppedQueryStart || 0) + (st.droppedPerf || 0);
-  if (dropped > 0 || (st.skippedFiles || 0) > 0) {
+  if (dropped > 0) {
     alert(
-      `Some rows were skipped because the dataset exceeded the built-in safety limits:\n\n`
+      `This bundle is unusually large, so the following per-category safety caps were reached and extra rows were not loaded:\n\n`
       + `Log events: ${fmtN(st.droppedLogs || 0)}\n`
       + `QueryExecution rows: ${fmtN(st.droppedQueryExec || 0)}\n`
       + `QueryStart rows: ${fmtN(st.droppedQueryStart || 0)}\n`
-      + `Performance rows: ${fmtN(st.droppedPerf || 0)}\n`
-      + `Skipped heavy files: ${fmtN(st.skippedFiles || 0)}`
+      + `Performance rows: ${fmtN(st.droppedPerf || 0)}`
     );
   }
 }
