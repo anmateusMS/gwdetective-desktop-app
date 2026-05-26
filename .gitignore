@@ -19,6 +19,7 @@ x86/
 
 ## Installer output
 installer/Output/
+**/installer/Output/
 
 ## NuGet
 *.nupkg

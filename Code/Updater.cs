@@ -28,7 +28,7 @@ internal static class Updater
     // variable to override this without rebuilding (e.g. point at a local
     // http://localhost:.../latest.json served by a test rig).
     private const string DefaultManifestUrl =
-        "https://example.invalid/gwdetective/latest.json";
+        "https://github.com/anmateusMS/gwdetective-desktop-app/releases/latest/download/latest.json";
 
     public static string ManifestUrl =>
         Environment.GetEnvironmentVariable("GWDETECTIVE_UPDATE_URL") is { Length: > 0 } envUrl
