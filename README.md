@@ -1,12 +1,142 @@
 # GW Detective
 
-Desktop edition of the GW Tracer gateway log analyser. Wraps the existing
-single-file SPA in a WebView2 host and adds a C# streaming-zip parser, so
-multi-gigabyte log bundles that crash the in-browser worker open cleanly.
+An offline, single-page **On-premises Data Gateway log analyser**. Drop in a
+support-bundle `.zip` and get a navigable dashboard of errors, query
+performance, Power Platform attribution, network port reachability, and
+performance counters — without uploading anything anywhere.
+
+GW Detective ships as both a self-contained SPA (the `Code/web/index.html`
+bundle, which also runs as-is in any modern browser) and as a Windows
+desktop app that hosts that SPA in WebView2 and replaces the in-browser
+zip parser with a streaming C# implementation so multi-gigabyte log
+bundles open cleanly.
 
 - **Platforms:** Windows 10/11, x64 and ARM64
 - **Install scope:** Per-user (`%LOCALAPPDATA%\Programs\GWDetective`) — no admin required
 - **Runtime:** Self-contained .NET 8 single-file exe + Microsoft Edge WebView2
+- **Privacy:** 100% local. Nothing is uploaded; parsing runs in-process.
+
+## Features
+
+### Ingest
+
+- Open an On-premises Data Gateway support `.zip` via the **Open Zip File**
+  button or drag-and-drop.
+- Two parse modes:
+  - **Basic** (default) — errors + info logs only; skips heavy CSV /
+    performance / mashup files. Snappy on huge bundles.
+  - **Full** — all logs, query reports, performance aggregations, and
+    Power Platform attribution.
+- Session cache: optionally reopen the most recently parsed bundle from
+  the local IndexedDB cache (browser build) or local profile (desktop).
+- Built-in memory safeguards drop excess rows rather than crashing:
+  180k log entries, 120k query / perf rows per category, 4k chars per
+  message, 200 KB per config-file preview (400 KB for port reports).
+
+### Dashboard
+
+- **Gateway identity hero card** — Name, Machine, Version, Cluster ID,
+  Service Account, Region, plus ~20 expandable custom-metadata fields
+  pulled from `GatewayCluster.txt` / `GatewayProperties.json`.
+- Summary tiles for total events / errors / warnings / info /
+  correlation IDs, plus query success rate, average duration and P90.
+- Hourly stacked **timeline chart** of event volume by severity.
+- **Top errors and criticals** (#1–25 by frequency) and **top error
+  codes** (e.g. `80004005`) with frequency bars. Click any row to jump
+  to the Errors tab with that message pre-filtered.
+- **Top exception types** — .NET class names ranked by mention count.
+
+### Logs (Errors · Info · Network · Mashup · Installer)
+
+- Sortable, searchable tables with Timestamp · Level · Module · Message,
+  plus **Product** and **Connector** columns when Power Platform
+  attribution is available (Power Automate, Logic Apps, Power BI,
+  PowerApps, …).
+- Per-tab badges showing entry counts.
+- Network tab also injects synthesized **port-test** entries inline so
+  connectivity events appear chronologically with real log events.
+
+### Queries
+
+- Query Execution Report view with success/fail tiles, total · average ·
+  P90 · slowest stats, and a duration bar per row (green / orange / red
+  thresholds).
+- Click any query to open a trace panel with status, durations
+  (read / serialization / total), request and tracking IDs, Power
+  Platform root / current activity IDs, and a **Trace in logs** jump.
+
+### Power Platform
+
+- Attribution dashboard surfaced when `QueryStartReport_*.log` is
+  present in the bundle.
+- Client distribution (PowerAutomate / LogicApps / Power BI Datasets /
+  PowerQueryOnline / PowerApps / Dataflows), connector-type breakdown,
+  and ranked tables of top flows / logic apps / connectors / endpoints
+  by call volume.
+
+### Performance
+
+- Top stats strip: time range, peak CPU %, peak Gateway / Mashup memory,
+  total aggregated queries, fail rate, connection status — with
+  warning / danger colour thresholds.
+- Six 5-minute-bucket time-series charts: CPU usage, memory usage,
+  concurrent operations, thread-pool activity, queries per bucket
+  (success vs fail), and average / max query duration.
+- Top mashups by CPU time and slowest connection opens, with click-to-
+  trace on the underlying request ID where available.
+
+### Ports
+
+- One card per `GatewayPorts_*.log` run, newest first.
+- Pass/fail score, detected region, host name and IP, Service Bus
+  namespace, proxy configuration (with a single-proxy SPOF warning),
+  test timestamp + relative age, and a one-click copy-summary button.
+- Per-server port grid (🟢 open · 🔴 blocked · ⚪ unknown) with live
+  filter, *show failed only*, and an opt-in **group relay clusters**
+  toggle that collapses `gv0…gv23` into a single roll-up row.
+
+### Config
+
+- Expandable list of every non-port text / config file in the bundle
+  (`.config`, `.txt`, `.json`, `.xml`, …) with size and pretty-printed
+  body on click. Large files are truncated with a clear indicator.
+
+### Filtering, search and tracing
+
+- Per-tab **Level**, **Module** and **free-text** filters with a clear
+  button and live "X / Y entries" counter.
+- Global **From / To datetime filter** that re-derives every tab,
+  dashboard tile, chart and aggregation when changed.
+- **Trace panel** (right sidebar): click any log entry with a
+  correlation ID to see all correlated events as a colour-coded
+  vertical timeline, or click any query to see its full metadata.
+  One-click copy-trace-to-clipboard.
+- **Compare ⇄** — pin any trace as **A** or **B** and open a
+  side-by-side overlay showing per-side stats (event / error / warning
+  counts, duration, modules, time span) and the two timelines together.
+
+### UX
+
+- Dark "Cool Slate" theme with semantic colours for severity.
+- Virtual scrolling on large tables.
+- Multi-state column sorting (asc → desc → unsorted).
+- Keyboard: **Esc** closes Compare; **Ctrl+F** searches within expanded
+  config previews.
+
+### Desktop-only extras
+
+- Streaming C# zip parser ([Code/Parser.cs](Code/Parser.cs)) replaces the
+  in-page Web Worker, so the 700 MB-ish browser ceiling no longer
+  applies — multi-GB bundles stream straight through.
+- Native Windows file picker via a small JS ↔ .NET bridge in
+  [Code/web/renderer-patch.js](Code/web/renderer-patch.js).
+- In-app auto-updater (see below) — no separate launcher needed.
+
+### Out of scope
+
+GW Detective is a read-only forensic viewer. There is no upload, export,
+real-time tailing, multi-bundle correlation, alerting, authentication,
+or report generation.
 
 ## Download
 
