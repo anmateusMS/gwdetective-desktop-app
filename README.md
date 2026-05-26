@@ -1,15 +1,9 @@
 # GW Detective
 
-An offline, single-page **On-premises Data Gateway log analyser**. Drop in a
-support-bundle `.zip` and get a navigable dashboard of errors, query
-performance, Power Platform attribution, network port reachability, and
-performance counters — without uploading anything anywhere.
-
-GW Detective ships as both a self-contained SPA (the `Code/web/index.html`
-bundle, which also runs as-is in any modern browser) and as a Windows
-desktop app that hosts that SPA in WebView2 and replaces the in-browser
-zip parser with a streaming C# implementation so multi-gigabyte log
-bundles open cleanly.
+An offline Windows desktop app for analysing **On-premises Data Gateway**
+support bundles. Drop in a `.zip` and get a navigable dashboard of errors,
+query performance, Power Platform attribution, network port reachability,
+and performance counters — without uploading anything anywhere.
 
 - **Platforms:** Windows 10/11, x64 and ARM64
 - **Install scope:** Per-user (`%LOCALAPPDATA%\Programs\GWDetective`) — no admin required
@@ -27,11 +21,13 @@ bundles open cleanly.
     performance / mashup files. Snappy on huge bundles.
   - **Full** — all logs, query reports, performance aggregations, and
     Power Platform attribution.
-- Session cache: optionally reopen the most recently parsed bundle from
-  the local IndexedDB cache (browser build) or local profile (desktop).
-- Built-in memory safeguards drop excess rows rather than crashing:
-  180k log entries, 120k query / perf rows per category, 4k chars per
-  message, 200 KB per config-file preview (400 KB for port reports).
+- Session cache: optionally reopen the most recently parsed bundle on
+  next launch.
+- Streaming parser handles multi-GB bundles without loading the whole
+  archive into memory. Built-in safeguards still cap extreme datasets
+  (180k log entries, 120k query / perf rows per category, 4k chars per
+  message, 200 KB per config-file preview, 400 KB for port reports) and
+  surface a notice when rows are dropped.
 
 ### Dashboard
 
@@ -123,15 +119,6 @@ bundles open cleanly.
 - Keyboard: **Esc** closes Compare; **Ctrl+F** searches within expanded
   config previews.
 
-### Desktop-only extras
-
-- Streaming C# zip parser ([Code/Parser.cs](Code/Parser.cs)) replaces the
-  in-page Web Worker, so the 700 MB-ish browser ceiling no longer
-  applies — multi-GB bundles stream straight through.
-- Native Windows file picker via a small JS ↔ .NET bridge in
-  [Code/web/renderer-patch.js](Code/web/renderer-patch.js).
-- In-app auto-updater (see below) — no separate launcher needed.
-
 ### Out of scope
 
 GW Detective is a read-only forensic viewer. There is no upload, export,
@@ -174,9 +161,9 @@ dotnet run --project Code\GatewayTracer.Desktop.csproj
 Code/                          # WPF + WebView2 host
   App.xaml(.cs)                # Application entry
   MainWindow.xaml(.cs)         # WebView2 host window
-  Parser.cs                    # Streaming zip log parser (replaces the in-page worker)
+  Parser.cs                    # Streaming zip log parser
   Updater.cs                   # Manifest probe + SHA-verified silent install
-  web/                         # SPA shipped inside the exe (index.html + renderer-patch.js)
+  web/                         # UI assets shipped inside the exe
   installer/
     GWDetective.iss            # Inno Setup 6 script (per-user, x64 + arm64)
     sync-version.ps1           # Pushes csproj <Version> into the .iss before each ISCC build
@@ -266,5 +253,5 @@ silently relaunches the freshly installed exe.
 
 ## License
 
-See repository for licensing terms. SPA bundle and parser are MIT-licensed
-(see `// SPDX-License-Identifier: MIT` headers).
+See repository for licensing terms. The bundled UI and parser are
+MIT-licensed (see `// SPDX-License-Identifier: MIT` headers).
