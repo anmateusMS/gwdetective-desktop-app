@@ -1491,10 +1491,10 @@ importScripts('https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js');
 const _td = new TextDecoder('utf-8', { fatal: false });
 
 // ── Constants (kept in sync with main script) ───────────────────────────────
-const MAX_LOG_ENTRIES_TOTAL   = 180000;
-const MAX_QUERY_EXEC_ROWS     = 120000;
-const MAX_QUERY_START_ROWS    = 120000;
-const MAX_PERF_ROWS_PER_TYPE  = 120000;
+const MAX_LOG_ENTRIES_TOTAL   = Infinity;
+const MAX_QUERY_EXEC_ROWS     = Infinity;
+const MAX_QUERY_START_ROWS    = Infinity;
+const MAX_PERF_ROWS_PER_TYPE  = Infinity;
 const RAW_FILE_MAX_CHARS      = 200000;
 const PORT_RAW_FILE_MAX_CHARS = 400000;
 const MAX_ENTRY_MESSAGE_CHARS = 4000;
@@ -2001,10 +2001,10 @@ state.ingestStats      = null;  // dropped rows when low-memory caps are hit
 const LOG_TABS = ['errors','info','network','mashup','queries','installer'];
 
 // Aggressive caps to keep browser memory bounded on very large uploads.
-const MAX_LOG_ENTRIES_TOTAL = 180000;
-const MAX_QUERY_EXEC_ROWS = 120000;
-const MAX_QUERY_START_ROWS = 120000;
-const MAX_PERF_ROWS_PER_TYPE = 120000;
+const MAX_LOG_ENTRIES_TOTAL = Infinity;
+const MAX_QUERY_EXEC_ROWS = Infinity;
+const MAX_QUERY_START_ROWS = Infinity;
+const MAX_PERF_ROWS_PER_TYPE = Infinity;
 const HARD_MAX_ZIP_BYTES = 700 * 1024 * 1024;
 
 // ── File → tab mapping ───────────────────────────────────────────────────────

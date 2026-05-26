@@ -19,10 +19,13 @@ namespace GatewayTracer.Desktop;
 
 internal static class ParserConstants
 {
-    public const int MaxLogEntriesTotal   = 180_000;
-    public const int MaxQueryExecRows     = 120_000;
-    public const int MaxQueryStartRows    = 120_000;
-    public const int MaxPerfRowsPerType   = 120_000;
+    // Row-count caps were a memory-saving holdover from the browser build.
+    // On desktop we let the parser ingest everything; these are kept as
+    // effectively-unbounded sentinels so existing arithmetic still compiles.
+    public const int MaxLogEntriesTotal   = int.MaxValue;
+    public const int MaxQueryExecRows     = int.MaxValue;
+    public const int MaxQueryStartRows    = int.MaxValue;
+    public const int MaxPerfRowsPerType   = int.MaxValue;
     public const int RawFileMaxChars      = 200_000;
     public const int PortRawFileMaxChars  = 400_000;
     public const int MaxEntryMessageChars = 4_000;
