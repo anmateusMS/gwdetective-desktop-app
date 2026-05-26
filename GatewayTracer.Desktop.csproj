@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>GWDetective</AssemblyName>
+    <RootNamespace>GatewayTracer.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Single source of truth for the app version. installer\sync-version.ps1
+         pushes this into GWDetective.iss before each ISCC build, and the
+         in-app Updater compares it against the published manifest. -->
+    <Version>0.0.0.1</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <!-- Embedded Win32 icon used by Explorer, taskbar, Alt-Tab, shortcuts,
+         the installer wizard and Apps & Features. Regenerate via
+         installer\build-icon.ps1 whenever the source icon changes. -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <!-- Single-file portable publish defaults. Override on the CLI if needed. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship the existing single-file SPA + the desktop renderer patch alongside the exe. -->
+    <Content Include="web\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
+
