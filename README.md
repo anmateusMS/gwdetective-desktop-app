@@ -221,16 +221,16 @@ powershell -ExecutionPolicy Bypass -File .\sync-version.ps1
 
 # 4. Generate latest.json (hashes the two setup .exe files).
 powershell -ExecutionPolicy Bypass -File .\publish-manifest.ps1 `
-    -Version 0.1.0 `
-    -BaseUrl 'https://github.com/anmateusMS/gwdetective-desktop-app/releases/download/v0.1.0' `
+    -Version 1.0.0 `
+    -BaseUrl 'https://github.com/anmateusMS/gwdetective-desktop-app/releases/download/v1.0.0' `
     -Notes   'Release notes shown in the in-app updater.'
 
 # 5. Publish via gh CLI (or upload through the GitHub UI).
-gh release create v0.1.0 `
+gh release create v1.0.0 `
     Output\GWDetective-Setup-x64.exe   `
     Output\GWDetective-Setup-arm64.exe `
     Output\latest.json                 `
-    --title v0.1.0 --notes-file ..\..\CHANGELOG.md --latest
+    --title v1.0.0 --notes-file ..\..\CHANGELOG.md --latest
 ```
 
 The release must be marked **Latest** for the
