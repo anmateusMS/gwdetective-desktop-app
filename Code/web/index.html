@@ -921,7 +921,7 @@ body {
 .port-toolbar .pt-count { font-size:11px;color:var(--cp-text-muted);margin-left:auto; }
 
 /* Server cards */
-.port-server-list { padding:8px 0; }
+.port-server-list { padding:8px 0;min-height:900px; }
 .port-server { padding:10px 16px;border-bottom:1px solid var(--cp-border);display:grid;grid-template-columns:minmax(0,2.4fr) 130px 1fr;gap:12px;align-items:center; }
 .port-server:last-child { border-bottom:none; }
 .port-server.hidden { display:none; }
@@ -1134,8 +1134,7 @@ body {
           </svg>
           View on GitHub
         </a>
-        <!-- TODO: replace mailto target with your feedback email -->
-        <a href="mailto:anmateus@microsoft.com?subject=GW%20Detective%20feedback" id="link-feedback" title="Send feedback by email">
+        <a href="https://github.com/anmateusMS/gwdetective-desktop-app/issues/new" id="link-feedback" target="_blank" rel="noopener noreferrer" title="Create a new issue on GitHub">
           💬 Send Feedback
         </a>
       </div>
@@ -1197,7 +1196,8 @@ body {
     <button class="tab-btn" data-tab="powerplatform">Power Platform</button>
     <button class="tab-btn" data-tab="performance">Performance</button>
     <button class="tab-btn" data-tab="ports">Ports</button>
-    <button class="tab-btn" data-tab="installer">Installer</button>
+    <button class="tab-btn" data-tab="clusters">Clusters</button>
+
     <button class="tab-btn" data-tab="config">Config</button>
   </nav>
 
@@ -1282,7 +1282,7 @@ body {
     <div id="tab-errors" class="tab-pane">
       <div class="log-table-wrap">
         <div class="log-col-headers" data-tab="errors">
-          <span data-field="timestamp">Timestamp</span><span data-field="level">Level</span><span data-field="module">Module</span><span class="col-attribution col-product" data-field="_product">Product</span><span class="col-attribution col-connector" data-field="_connector">Connector</span><span data-field="message">Message</span>
+          <span data-field="timestamp">Timestamp</span><span data-field="level">Level</span><span data-field="correlationIds">Correlation Trace ID</span><span data-field="message">Message</span>
         </div>
         <div id="vs-errors" class="log-viewport"></div>
       </div>
@@ -1323,13 +1323,13 @@ body {
       <div id="query-report-wrap" style="display:none;flex-direction:column;flex:1;overflow:hidden">
         <div class="query-summary" id="query-summary"></div>
         <div class="query-col-headers" data-tab="querycsv">
-          <span data-field="_ts">End Time</span><span data-field="_ok">✓</span><span data-field="_dur">Duration</span><span data-field="_type">Type</span><span class="col-attribution col-product" data-field="_product">Product</span><span class="col-attribution col-connector" data-field="_connector">Connector</span><span data-field="_src">Data Source</span><span data-field="_err">Error</span>
+          <span data-field="_ts">End Time</span><span data-field="_ok">✓</span><span data-field="_dur">Duration</span><span data-field="_type">Type</span><span data-field="_src">Data Source</span><span data-field="_err">Error</span>
         </div>
         <div id="vs-querycsv" class="log-viewport"></div>
       </div>
       <div id="query-log-wrap" class="log-table-wrap" style="display:none;flex-direction:column;flex:1;overflow:hidden">
         <div class="log-col-headers" data-tab="queries">
-          <span data-field="timestamp">Timestamp</span><span data-field="level">Level</span><span data-field="module">Module</span><span class="col-attribution col-product" data-field="_product">Product</span><span class="col-attribution col-connector" data-field="_connector">Connector</span><span data-field="message">Message</span>
+          <span data-field="timestamp">Timestamp</span><span data-field="level">Level</span><span data-field="module">Module</span><span data-field="message">Message</span>
         </div>
         <div id="vs-queries" class="log-viewport"></div>
       </div>
@@ -1356,11 +1356,11 @@ body {
           </div>
           <div class="agg-card">
             <div class="agg-title">
-              Connector Types
+              Sources
               <span class="agg-total" id="pp-conntypes-total"></span>
             </div>
             <div class="agg-col-headers cols-agg" data-tab="ppconntypes">
-              <span>#</span><span data-field="key">Connector type</span><span>Frequency</span><span data-field="count">Calls</span>
+              <span>#</span><span data-field="key">Source</span><span>Frequency</span><span data-field="count">Calls</span>
             </div>
             <div id="pp-conntypes-body"></div>
           </div>
@@ -1379,16 +1379,6 @@ body {
           </div>
           <div id="pp-endpoints-body"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- Installer -->
-    <div id="tab-installer" class="tab-pane">
-      <div class="log-table-wrap">
-        <div class="log-col-headers" data-tab="installer">
-          <span data-field="timestamp">Timestamp</span><span data-field="level">Level</span><span data-field="module">Module</span><span data-field="message">Message</span>
-        </div>
-        <div id="vs-installer" class="log-viewport"></div>
       </div>
     </div>
 
@@ -1427,6 +1417,11 @@ body {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Clusters -->
+    <div id="tab-clusters" class="tab-pane">
+      <div id="clusters-body" class="ports-container"></div>
     </div>
 
     <!-- Config -->
@@ -1498,12 +1493,37 @@ const MAX_PERF_ROWS_PER_TYPE  = Infinity;
 const RAW_FILE_MAX_CHARS      = 200000;
 const PORT_RAW_FILE_MAX_CHARS = 400000;
 const MAX_ENTRY_MESSAGE_CHARS = 4000;
-const LOG_TABS = ['errors','info','network','mashup','queries','installer'];
+const LOG_TABS = ['errors','info','network','mashup','queries'];
 
 const LINE_RE  = /^(\S+)\s+(Information|Warning|Error|Critical|Verbose):\s*\d+\s*:\s*(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s+([\s\S]+)$/;
 const UUID_SRC = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const MSGCODE_RE = /\b([0-9A-F]{8})\b/;
 const MODULE_RE  = /\[([^\]]+)\]\s*([\s\S]*)$/;
+
+// Error-code extractor. Tries several common gateway/error patterns in
+// priority order and skips noise tokens (00000000, FFFFFFFF, etc.).
+const _ERR_NOISE = new Set(['00000000','FFFFFFFF']);
+const _ERR_PATTERNS = [
+  { re: /\b0x([0-9A-Fa-f]{8})\b/,                                                   fmt: m => '0x' + m[1].toUpperCase() },
+  { re: /HRESULT[^0-9A-Fa-fxX]{0,8}0x?([0-9A-Fa-f]{4,8})/i,                          fmt: m => '0x' + m[1].toUpperCase().padStart(8,'0') },
+  { re: /\bWin32(?:\s+error)?[^0-9A-Fa-fxX]{0,8}0x?([0-9A-Fa-f]{1,8})/i,             fmt: m => 'Win32 0x' + m[1].toUpperCase() },
+  { re: /\b(?:ErrorCode|Error\s*Code|Code|Reason|Status)[\s:=]+([A-Z][A-Za-z0-9_]{2,40})\b/, fmt: m => m[1] },
+  { re: /\b(?:HTTP\/\d\.\d|StatusCode)[\s:]*([1-5][0-9]{2})\b/i,                      fmt: m => 'HTTP ' + m[1] },
+  { re: /\b([0-9A-F]{8})\b/,                                                         fmt: m => m[1] },
+];
+function extractMessageCode(text) {
+  if (!text) return '';
+  for (const p of _ERR_PATTERNS) {
+    const m = text.match(p.re);
+    if (!m) continue;
+    const code = p.fmt(m);
+    const upper = code.replace(/^0x/i, '').replace(/^Win32\s+0x/i,'').toUpperCase();
+    if (_ERR_NOISE.has(upper)) continue;
+    if (/^0+$/.test(upper) || /^F+$/.test(upper)) continue;
+    return code;
+  }
+  return '';
+}
 
 let _idSeq = 0;
 
@@ -1513,10 +1533,7 @@ function getEntryTab(name) {
   if (n.includes('gatewayerrors'))  return 'errors';
   if (n.includes('gatewayinfo'))    return 'info';
   if (n.includes('gatewaynetwork')) return 'network';
-  if (/^mashup\d/i.test(n) || n.includes('mashup20')) return 'mashup';
-  if (n.includes('on-premises_data_gateway') ||
-      n.includes('gatewayconfigurator') ||
-      n.includes('integrationruntime')) return 'installer';
+  if (n.startsWith('mashup')) return 'mashup';
   return null;
 }
 function isQueryExecCsv(name)  { return /queryexecutionreport/i.test(name); }
@@ -1753,8 +1770,7 @@ function parseLine(line, filename, tab) {
   if (message.length > MAX_ENTRY_MESSAGE_CHARS) {
     message = message.substring(0, MAX_ENTRY_MESSAGE_CHARS) + '\n… (message truncated)';
   }
-  const codeMatch = rest.match(MSGCODE_RE);
-  const messageCode = codeMatch ? codeMatch[1] : '';
+  const messageCode = extractMessageCode(rest);
   return { id: _idSeq++, source, level, timestamp, correlationIds, module, messageCode, message, file: filename, tab };
 }
 
@@ -1998,7 +2014,7 @@ state.globalDateFilter = { from: null, to: null }; // applied to every tab
 state._orig            = null;  // pristine copies of source arrays for re-filtering
 state.ingestStats      = null;  // dropped rows when low-memory caps are hit
 
-const LOG_TABS = ['errors','info','network','mashup','queries','installer'];
+const LOG_TABS = ['errors','info','network','mashup','queries'];
 
 // Aggressive caps to keep browser memory bounded on very large uploads.
 const MAX_LOG_ENTRIES_TOTAL = Infinity;
@@ -2013,10 +2029,7 @@ function getEntryTab(name) {
   if (n.includes('gatewayerrors'))   return 'errors';
   if (n.includes('gatewayinfo'))     return 'info';
   if (n.includes('gatewaynetwork'))  return 'network';
-  if (/^mashup\d/i.test(n) || n.includes('mashup20'))  return 'mashup';
-  if (n.includes('on-premises_data_gateway') ||
-      n.includes('gatewayconfigurator') ||
-      n.includes('integrationruntime')) return 'installer';
+  if (n.startsWith('mashup'))  return 'mashup';
   return null;
 }
 
@@ -2432,6 +2445,31 @@ const UUID_RE  = new RegExp(UUID_SRC, 'gi');
 const MSGCODE_RE = /\b([0-9A-F]{8})\b/;
 const MODULE_RE  = /\[([^\]]+)\]\s*([\s\S]*)$/;
 
+// Error-code extractor. Tries common gateway/error patterns in priority order
+// and skips noise tokens (00000000, FFFFFFFF, all-0/all-F).
+const _ERR_NOISE = new Set(['00000000','FFFFFFFF']);
+const _ERR_PATTERNS = [
+  { re: /\b0x([0-9A-Fa-f]{8})\b/,                                                   fmt: m => '0x' + m[1].toUpperCase() },
+  { re: /HRESULT[^0-9A-Fa-fxX]{0,8}0x?([0-9A-Fa-f]{4,8})/i,                          fmt: m => '0x' + m[1].toUpperCase().padStart(8,'0') },
+  { re: /\bWin32(?:\s+error)?[^0-9A-Fa-fxX]{0,8}0x?([0-9A-Fa-f]{1,8})/i,             fmt: m => 'Win32 0x' + m[1].toUpperCase() },
+  { re: /\b(?:ErrorCode|Error\s*Code|Code|Reason|Status)[\s:=]+([A-Z][A-Za-z0-9_]{2,40})\b/, fmt: m => m[1] },
+  { re: /\b(?:HTTP\/\d\.\d|StatusCode)[\s:]*([1-5][0-9]{2})\b/i,                      fmt: m => 'HTTP ' + m[1] },
+  { re: /\b([0-9A-F]{8})\b/,                                                         fmt: m => m[1] },
+];
+function extractMessageCode(text) {
+  if (!text) return '';
+  for (const p of _ERR_PATTERNS) {
+    const m = text.match(p.re);
+    if (!m) continue;
+    const code = p.fmt(m);
+    const upper = code.replace(/^0x/i, '').replace(/^Win32\s+0x/i,'').toUpperCase();
+    if (_ERR_NOISE.has(upper)) continue;
+    if (/^0+$/.test(upper) || /^F+$/.test(upper)) continue;
+    return code;
+  }
+  return '';
+}
+
 let _idSeq = 0;
 const DROP_VERBOSE_IN_LOW_MEMORY = true;
 const RAW_FILE_MAX_CHARS = 200000;
@@ -2478,7 +2516,7 @@ function parseLine(line, filename, tab) {
   }
 
   const codeMatch = rest.match(MSGCODE_RE);
-  const messageCode = codeMatch ? codeMatch[1] : '';
+  const messageCode = (typeof extractMessageCode === 'function') ? extractMessageCode(rest) : (codeMatch ? codeMatch[1] : '');
 
   return { id: _idSeq++, source, level, timestamp, correlationIds, module, messageCode, message, file: filename, tab };
 }
@@ -2644,6 +2682,10 @@ class VirtualScroller {
   refresh() { this._render(); }
 
   _render() {
+    // Defensive resync — keeps spacer height matching the current item count
+    // even if items were mutated in-place without going through setItems().
+    const expected = (this.items.length * this.rowH) + 'px';
+    if (this.spacer.style.height !== expected) this.spacer.style.height = expected;
     const scrollTop = this.vp.scrollTop;
     const vh = this.vp.clientHeight || 600;
     const buf = 20;
@@ -2676,7 +2718,13 @@ function makeRow(entry) {
                   lvl === 'verbose'     ? 'VERB' : entry.level.toUpperCase();
 
   const mo = document.createElement('span'); mo.className = 'col-module';
-  mo.textContent = entry.module; mo.title = entry.module;
+  const corr = Array.isArray(entry.correlationIds) ? entry.correlationIds : [];
+  if (entry.tab === 'errors') {
+    mo.textContent = corr[0] || '';
+    mo.title = corr.length > 1 ? corr.join('\n') : (corr[0] || '');
+  } else {
+    mo.textContent = entry.module; mo.title = entry.module;
+  }
 
   const attr = lookupAttribution(entry.correlationIds);
   const prod = renderProductCell(attr);
@@ -3100,23 +3148,14 @@ function buildUI() {
     document.getElementById('query-log-wrap').style.display = 'flex';
   }
 
-  // Reveal the "Flow / Connector" attribution column on the errors / queries
-  // tables whenever QueryStartReport rows exist (the only source of Power
-  // Platform identity). Without that data the column stays hidden so we don't
-  // show a permanently-empty cell.
-  if (state.attributionIndex && state.attributionIndex.size > 0) {
-    const errWrap = document.querySelector('#tab-errors .log-table-wrap');
-    if (errWrap) errWrap.classList.add('with-attribution');
-    const qcsv = document.getElementById('query-report-wrap');
-    if (qcsv) qcsv.classList.add('with-attribution');
-    const qlog = document.getElementById('query-log-wrap');
-    if (qlog) qlog.classList.add('with-attribution');
-  }
+  // Attribution columns (Product / Connector) are no longer shown on the
+  // Errors or Queries tables.
 
   buildDashboard();
   buildPortsTab();
   buildPerformanceTab();
   buildPowerPlatformTab();
+  buildClustersTab();
   buildConfigTab();
 
   // Wire sortable column headers for dashboard + performance aggregation tables
@@ -3402,10 +3441,12 @@ function buildTopAggregations() {
   if (!errorEntries.length) { if (row) row.style.display = 'none'; return; }
   if (row) row.style.display = 'grid';
 
-  // Top error codes
+  // Top error codes (skip entries with no extractable code — those are
+  // grouped under '(none)' and don't add signal).
   const codeMap = {};
   for (const e of errorEntries) {
-    const code = e.messageCode || '(none)';
+    const code = e.messageCode;
+    if (!code) continue;
     if (!codeMap[code]) codeMap[code] = { code, count: 0, sample: e.message };
     codeMap[code].count++;
   }
@@ -4337,6 +4378,197 @@ function copyPortSummary(btn) {
 }
 
 // ── Config tab ───────────────────────────────────────────────────────────────
+function buildClustersTab() {
+  const body = document.getElementById('clusters-body');
+  if (!body) return;
+
+  // Pick up GatewayCluster.txt, GatewayAllClusters.* and GatewayProperties.*
+  // from the cached raw files. Names vary slightly across gateway versions.
+  const files = Object.entries(state.rawFiles).filter(([n]) => {
+    const ln = n.toLowerCase();
+    return ln.includes('gatewaycluster')
+        || ln.includes('gatewayallclusters')
+        || ln.includes('gatewayproperties');
+  });
+
+  if (files.length === 0) {
+    body.innerHTML = '<div class="empty-state"><span class="empty-icon">🗄️</span>No cluster information found. Expected GatewayCluster, GatewayAllClusters or GatewayProperties files.</div>';
+    return;
+  }
+
+  // Flatten every file into a list of cluster records.
+  // Each record carries { name, source, fields: {k: v}, members: [{k: v}, ...] }
+  const clusters = [];
+  for (const [name, text] of files) {
+    const trimmed = (text || '').trim();
+    if (!trimmed) continue;
+    let parsed = null;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try { parsed = JSON.parse(trimmed); } catch {}
+    }
+    if (parsed != null) {
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      for (let i = 0; i < arr.length; i++) {
+        const obj = arr[i];
+        if (!obj || typeof obj !== 'object') continue;
+        clusters.push(extractClusterRecord(obj, name, arr.length > 1 ? i + 1 : null));
+      }
+    } else {
+      // Plain key=value fallback (legacy GatewayCluster.txt).
+      const fields = {};
+      for (const line of text.split(/\r?\n/)) {
+        const m = line.match(/^\s*([^=:]+?)\s*[:=]\s*(.+?)\s*$/);
+        if (m) fields[m[1]] = m[2];
+      }
+      if (Object.keys(fields).length > 0) clusters.push({ name, source: name, fields, members: [] });
+    }
+  }
+
+  if (clusters.length === 0) {
+    body.innerHTML = '<div class="empty-state"><span class="empty-icon">🗄️</span>Cluster files were found but contained no readable records.</div>';
+    return;
+  }
+
+  body.innerHTML = clusters.map(renderClusterCard).join('');
+}
+
+// ── Cluster helpers ─────────────────────────────────────────────────────────
+const CLUSTER_PRIMARY_KEYS = [
+  ['Cluster ID',        ['gatewayclusterid','clusterid','id']],
+  ['Cluster Name',      ['gatewayclustername','clustername','name','displayname']],
+  ['Region',            ['region','clusterregion','gatewayregion']],
+  ['Service Endpoint',  ['serviceendpoint','endpoint']],
+  ['Cluster Status',    ['clusterstatus','status','state']],
+  ['Load Balancing',    ['loadbalancingsetting','loadbalancing']],
+  ['Member Count',      ['membercount','numberofmembers','gatewaymemberscount']],
+  ['Primary Member',    ['primarymember','primarygatewayobjectid']],
+  ['Version',           ['version','clusterversion','gatewayversion']],
+  ['Created',           ['createddate','createdtime','createdon']],
+];
+
+const MEMBER_PRIMARY_KEYS = [
+  ['Name',        ['gatewayname','machinename','membername','name']],
+  ['Object ID',   ['gatewayobjectid','objectid','memberid','id']],
+  ['Version',     ['version','gatewayversion','gatewayinstalledversion']],
+  ['Status',      ['status','state','memberstatus','gatewaystatus']],
+  ['Machine',     ['machinename','hostname']],
+];
+
+function pickKey(obj, candidates) {
+  const lc = {};
+  for (const k of Object.keys(obj)) lc[k.toLowerCase()] = k;
+  for (const cand of candidates) {
+    if (lc[cand] != null) return lc[cand];
+  }
+  return null;
+}
+
+function extractClusterRecord(obj, sourceFile, idx) {
+  const fields = {};
+  const used = new Set();
+  for (const [label, cands] of CLUSTER_PRIMARY_KEYS) {
+    const key = pickKey(obj, cands);
+    if (key && obj[key] != null && obj[key] !== '') {
+      fields[label] = formatVal(obj[key]);
+      used.add(key);
+    }
+  }
+  // Find a members / gatewayMembers / nodes array.
+  const memberKey = pickKey(obj, ['gatewaymembers','members','clustermembers','nodes']);
+  const members = [];
+  if (memberKey && Array.isArray(obj[memberKey])) {
+    used.add(memberKey);
+    for (const m of obj[memberKey]) {
+      if (!m || typeof m !== 'object') continue;
+      const mFields = {};
+      const mUsed = new Set();
+      for (const [label, cands] of MEMBER_PRIMARY_KEYS) {
+        const key = pickKey(m, cands);
+        if (key && m[key] != null && m[key] !== '') {
+          mFields[label] = formatVal(m[key]);
+          mUsed.add(key);
+        }
+      }
+      // Stash any remaining scalar fields as extras.
+      const mExtras = {};
+      for (const k of Object.keys(m)) {
+        if (mUsed.has(k)) continue;
+        const v = m[k];
+        if (v == null || typeof v === 'object') continue;
+        mExtras[k] = formatVal(v);
+      }
+      members.push({ fields: mFields, extras: mExtras });
+    }
+  }
+  // Stash any remaining scalar fields on the cluster itself.
+  const extras = {};
+  for (const k of Object.keys(obj)) {
+    if (used.has(k)) continue;
+    const v = obj[k];
+    if (v == null || typeof v === 'object') continue;
+    extras[k] = formatVal(v);
+  }
+  const displayName = fields['Cluster Name'] || fields['Cluster ID'] || (idx != null ? `${sourceFile} [${idx}]` : sourceFile);
+  return { name: displayName, source: sourceFile, fields, members, extras };
+}
+
+function formatVal(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.length + ' item' + (v.length === 1 ? '' : 's');
+  return JSON.stringify(v);
+}
+
+function renderClusterCard(c) {
+  const primaryRows = Object.entries(c.fields).map(([k, v]) =>
+    `<span class="k">${esc(k)}</span><span class="v" title="${esc(v)}">${esc(v.length > 160 ? v.substring(0, 160) + '…' : v)}</span>`
+  ).join('');
+  const extraKeys = Object.keys(c.extras);
+  const extraRows = extraKeys.length
+    ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:11px;color:var(--cp-text-muted)">All fields (${extraKeys.length} more)</summary>
+         <div class="gw-info-grid" style="margin-top:6px">${extraKeys.sort().map(k =>
+           `<span class="k">${esc(k)}</span><span class="v" title="${esc(c.extras[k])}">${esc(c.extras[k].length > 200 ? c.extras[k].substring(0, 200) + '…' : c.extras[k])}</span>`
+         ).join('')}</div>
+       </details>`
+    : '';
+  const memberBlock = c.members.length
+    ? `<div class="gw-hero-section" style="margin-top:12px">
+         <div class="gw-section-label">Members (${c.members.length})</div>
+         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:6px">
+           ${c.members.map(m => `
+             <div style="padding:10px 12px;background:var(--cp-bg-darker);border:1px solid var(--cp-border);border-radius:6px">
+               <div class="gw-info-grid">${Object.entries(m.fields).map(([k, v]) =>
+                 `<span class="k">${esc(k)}</span><span class="v" title="${esc(v)}">${esc(v.length > 80 ? v.substring(0, 80) + '…' : v)}</span>`
+               ).join('')}</div>
+               ${Object.keys(m.extras).length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px;color:var(--cp-text-muted)">All fields (${Object.keys(m.extras).length})</summary>
+                 <div class="gw-info-grid" style="margin-top:6px">${Object.keys(m.extras).sort().map(k =>
+                   `<span class="k">${esc(k)}</span><span class="v" title="${esc(m.extras[k])}">${esc(m.extras[k].length > 120 ? m.extras[k].substring(0, 120) + '…' : m.extras[k])}</span>`
+                 ).join('')}</div>
+               </details>` : ''}
+             </div>`).join('')}
+         </div>
+       </div>`
+    : '';
+  return `<div class="gw-hero-card" style="display:block">
+    <div class="gw-hero-header">
+      <div class="gw-hero-icon">🗄️</div>
+      <div class="gw-hero-titles">
+        <div class="gw-hero-title">${esc(c.name)}</div>
+        <div class="gw-hero-subtitle">${esc(c.source)}</div>
+      </div>
+    </div>
+    <div class="gw-hero-sections" style="margin-top:10px">
+      <div class="gw-hero-section">
+        <div class="gw-section-label">Cluster</div>
+        <div class="gw-info-grid">${primaryRows || '<span class="k">—</span><span class="v">no recognised fields</span>'}</div>
+        ${extraRows}
+      </div>
+    </div>
+    ${memberBlock}
+  </div>`;
+}
+
 function buildConfigTab() {
   const list = document.getElementById('config-list');
   const files = Object.entries(state.rawFiles)
@@ -4468,18 +4700,12 @@ function formatConfigContent(name, text) {
         <span style="word-break:break-all;${k==='Status'?(row._ok?'color:var(--cp-success)':'color:var(--cp-danger)'):''}">${esc(v||'—')}</span>
       </div>`).join('');
 
-    // Add jump-to-logs action if we have an id that exists in any log entry
+    // Show a note if the request id isn't found in any log file
     const reqId = (row._requestId || row._trackingId || '').trim();
     if (reqId) {
       const reqIdLower = reqId.toLowerCase();
       const hasLogMatch = state.allEntries.some(e => e.correlationIds.includes(reqIdLower));
-      if (hasLogMatch) {
-        const bar = document.createElement('div');
-        bar.className = 'trace-action-bar';
-        bar.innerHTML = `<button class="trace-action-btn" onclick='showTrace(${JSON.stringify(reqId)})'>🔍 Trace in logs (${reqId.substring(0,8)}…)</button>`;
-        const body = document.getElementById('trace-body');
-        body.insertBefore(bar, body.firstChild);
-      } else {
+      if (!hasLogMatch) {
         const note = document.createElement('div');
         note.style.cssText = 'font-size:11px;color:var(--cp-text-muted);padding:6px 0;margin-bottom:8px;border-bottom:1px solid var(--cp-border)';
         note.textContent = `⚠ RequestId ${reqId.substring(0,12)}… not found in log files`;

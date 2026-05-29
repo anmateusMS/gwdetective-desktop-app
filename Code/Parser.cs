@@ -154,6 +154,15 @@ internal sealed class GatewayZipParser
                 await ParsePerfReportAsync(name, text, sink, perfCounts).ConfigureAwait(false);
                 continue;
             }
+            var entryTab = GetEntryTab(name);
+            if (entryTab is not null)
+            {
+                if (entryTab == "mashup" && LooksLikeJsonLines(text))
+                    await ParseMashupJsonAsync(text, name, batchLogs, sink, () => logCount, n => logCount = n).ConfigureAwait(false);
+                else
+                    await ParseLogTextAsync(text, name, entryTab, batchLogs, sink, () => logCount, n => logCount = n).ConfigureAwait(false);
+                continue;
+            }
             if (IsRawFile(name))
             {
                 var info = ExtractGwInfo(name, text);
@@ -163,15 +172,10 @@ internal sealed class GatewayZipParser
                 await sink.EmitAsync(new { ev = "parse-batch", kind = "rawFile", name, text = clipped }).ConfigureAwait(false);
                 continue;
             }
-            var entryTab = GetEntryTab(name);
-            if (entryTab is null)
             {
                 var clipped = CacheRawFileText(name, text);
                 await sink.EmitAsync(new { ev = "parse-batch", kind = "rawFile", name, text = clipped }).ConfigureAwait(false);
-                continue;
             }
-
-            await ParseLogTextAsync(text, name, entryTab, batchLogs, sink, () => logCount, n => logCount = n).ConfigureAwait(false);
         }
 
         // Flush any remaining log batches.
@@ -275,6 +279,118 @@ internal sealed class GatewayZipParser
         await FlushCurrentAsync().ConfigureAwait(false);
     }
 
+    // ── Mashup container NDJSON parser ──────────────────────────────────────
+    private static bool LooksLikeJsonLines(string text)
+    {
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == ' ' || c == '\r' || c == '\n' || c == '\t' || c == '\uFEFF') continue;
+            return c == '{';
+        }
+        return false;
+    }
+
+    private async Task ParseMashupJsonAsync(
+        string text, string filename,
+        Dictionary<string, List<object>> batchLogs, ParserSink sink,
+        Func<int> getLogCount, Action<int> setLogCount)
+    {
+        const string tab = "mashup";
+        if (!batchLogs.TryGetValue(tab, out var bucket))
+        {
+            bucket = new List<object>(ParserConstants.BatchSize);
+            batchLogs[tab] = bucket;
+        }
+
+        foreach (Match lm in LineSplitRe.Matches(text))
+        {
+            var line = lm.Value.Trim();
+            if (line.Length == 0 || line[0] != '{') continue;
+
+            string? startStr = null, action = null, activityId = null,
+                    productVersion = null, hostPid = null, evalId = null,
+                    levelRaw = null, exceptionType = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object) continue;
+                foreach (var p in doc.RootElement.EnumerateObject())
+                {
+                    switch (p.Name)
+                    {
+                        case "Start":           startStr       = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "Action":          action         = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "ActivityId":      activityId     = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "ProductVersion":  productVersion = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "HostProcessId":   hostPid        = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "evaluationID":    evalId         = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "Level":           levelRaw       = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                        case "ExceptionType":   exceptionType  = p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : null; break;
+                    }
+                }
+            }
+            catch (JsonException) { continue; }
+
+            // Normalize timestamp to ISO so the UI can sort/filter it.
+            string ts;
+            if (!string.IsNullOrEmpty(startStr) &&
+                DateTime.TryParse(startStr, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out var dt))
+            {
+                ts = dt.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                ts = startStr ?? "";
+            }
+
+            // Derive a level. Mashup logs don't carry the standard Level field
+            // most of the time; treat anything with an exception as Error.
+            string level = "Information";
+            if (!string.IsNullOrEmpty(exceptionType)) level = "Error";
+            else if (!string.IsNullOrEmpty(levelRaw))
+            {
+                var lr = levelRaw!.ToLowerInvariant();
+                if (lr.Contains("error") || lr.Contains("critical")) level = "Error";
+                else if (lr.Contains("warn")) level = "Warning";
+                else if (lr.Contains("verbose") || lr.Contains("debug") || lr.Contains("trace")) level = "Verbose";
+            }
+
+            var corr = new List<string>(1);
+            if (!string.IsNullOrEmpty(activityId) && UuidRe.IsMatch(activityId)) corr.Add(activityId!.ToLowerInvariant());
+
+            var entry = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["id"]             = Interlocked.Increment(ref _idSeq),
+                ["source"]         = string.IsNullOrEmpty(productVersion) ? "Mashup" : ("Mashup/" + productVersion),
+                ["level"]          = level,
+                ["timestamp"]      = ts,
+                ["correlationIds"] = corr.ToArray(),
+                ["module"]         = action ?? "",
+                ["messageCode"]    = "",
+                ["message"]        = TruncateMessage(line),
+                ["file"]           = filename,
+                ["tab"]            = tab,
+            };
+            if (!string.IsNullOrEmpty(action)) _modules.Add(action!);
+
+            if (getLogCount() >= ParserConstants.MaxLogEntriesTotal)
+            {
+                _stats.DroppedLogs++;
+                continue;
+            }
+            bucket.Add(entry);
+            setLogCount(getLogCount() + 1);
+            if (bucket.Count >= ParserConstants.BatchSize)
+            {
+                await sink.EmitAsync(new { ev = "parse-batch", kind = "log", tab, items = bucket.ToArray() }).ConfigureAwait(false);
+                bucket.Clear();
+            }
+        }
+    }
+
     private Dictionary<string, object?>? ParseLine(string line, string filename, string tab)
     {
         var m = LineRe.Match(line);
@@ -332,11 +448,7 @@ internal sealed class GatewayZipParser
         if (n.Contains("gatewayerrors"))  return "errors";
         if (n.Contains("gatewayinfo"))    return "info";
         if (n.Contains("gatewaynetwork")) return "network";
-        if (Regex.IsMatch(n, @"^mashup\d") || n.Contains("mashup20")) return "mashup";
-        if (n.Contains("on-premises_data_gateway") ||
-            n.Contains("gatewayconfigurator") ||
-            n.Contains("integrationruntime"))
-            return "installer";
+        if (n.StartsWith("mashup")) return "mashup";
         return null;
     }
     private static bool IsQueryExecCsv(string name)  => Regex.IsMatch(name, "queryexecutionreport", RegexOptions.IgnoreCase);
@@ -385,6 +497,41 @@ internal sealed class GatewayZipParser
         }
         res.Add(cur.ToString());
         return res;
+    }
+
+    /// <summary>
+    /// Yields full CSV records, honouring embedded newlines inside quoted
+    /// fields. Power BI gateway CSV reports (OpenConnectionReport in
+    /// particular) frequently embed JSON DataSource blobs with raw line
+    /// breaks, so a plain line splitter would shred those rows.
+    /// </summary>
+    private static IEnumerable<string> EnumerateCsvRecords(string text)
+    {
+        var cur = new StringBuilder(256);
+        bool inQ = false;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '"')
+            {
+                cur.Append(c);
+                if (inQ && i + 1 < text.Length && text[i + 1] == '"') { cur.Append('"'); i++; }
+                else inQ = !inQ;
+                continue;
+            }
+            if (!inQ && (c == '\n' || c == '\r'))
+            {
+                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                if (cur.Length > 0)
+                {
+                    yield return cur.ToString();
+                    cur.Clear();
+                }
+                continue;
+            }
+            cur.Append(c);
+        }
+        if (cur.Length > 0) yield return cur.ToString();
     }
 
     private static string ExtractDataSourceUrl(string ds)
@@ -460,14 +607,14 @@ internal sealed class GatewayZipParser
         dropped = 0; maxDur = 0;
         var rows = new List<object>(1024);
         if (room <= 0) { dropped = CountNonEmptyLines(text) - 1; if (dropped < 0) dropped = 0; return rows; }
-        var lines = LineSplitRe.Matches(text);
-        if (lines.Count == 0) return rows;
-        var headers = ParseCsvRow(lines[0].Value).Select(h => h.Trim()).ToList();
+        var records = EnumerateCsvRecords(text).GetEnumerator();
+        if (!records.MoveNext()) return rows;
+        var headers = ParseCsvRow(records.Current).Select(h => h.Trim()).ToList();
         var idx = new Dictionary<string, int>(StringComparer.Ordinal);
         for (int i = 0; i < headers.Count; i++) idx[headers[i]] = i;
-        for (int i = 1; i < lines.Count; i++)
+        while (records.MoveNext())
         {
-            var line = lines[i].Value;
+            var line = records.Current;
             if (string.IsNullOrWhiteSpace(line)) continue;
             if (rows.Count >= room) { dropped++; continue; }
             var vals = ParseCsvRow(line);
@@ -499,11 +646,12 @@ internal sealed class GatewayZipParser
         dropped = 0;
         var rows = new List<object>(1024);
         if (room <= 0) { dropped = CountNonEmptyLines(text) - 1; if (dropped < 0) dropped = 0; return rows; }
-        var lines = LineSplitRe.Matches(text);
-        if (lines.Count <= 1) return rows;
-        for (int i = 1; i < lines.Count; i++)
+        var records = EnumerateCsvRecords(text).GetEnumerator();
+        if (!records.MoveNext()) return rows;
+        // Skip header.
+        while (records.MoveNext())
         {
-            var line = lines[i].Value;
+            var line = records.Current;
             if (line is null || line.Length < 50) continue;
             if (rows.Count >= room) { dropped++; continue; }
             var vals = ParseCsvRow(line);
@@ -574,17 +722,17 @@ internal sealed class GatewayZipParser
         if (kind.Length == 0) return;
         int room = ParserConstants.MaxPerfRowsPerType - counts[kind];
 
-        var lines = LineSplitRe.Matches(text);
-        if (lines.Count == 0) return;
-        var headers = ParseCsvRow(lines[0].Value).Select(h => h.Trim()).ToList();
+        var records = EnumerateCsvRecords(text).GetEnumerator();
+        if (!records.MoveNext()) return;
+        var headers = ParseCsvRow(records.Current).Select(h => h.Trim()).ToList();
         var idx = new Dictionary<string, int>(StringComparer.Ordinal);
         for (int i = 0; i < headers.Count; i++) idx[headers[i]] = i;
 
         var rows = new List<object>(1024);
         int dropped = 0;
-        for (int i = 1; i < lines.Count; i++)
+        while (records.MoveNext())
         {
-            var line = lines[i].Value;
+            var line = records.Current;
             if (string.IsNullOrWhiteSpace(line)) continue;
             if (rows.Count >= room) { dropped++; continue; }
             var vals = ParseCsvRow(line);
@@ -616,13 +764,13 @@ internal sealed class GatewayZipParser
                     ["MaxWorkingSet"]              = SafeGet(vals, idx, "MaxWorkingSet").Trim(),
                     ["MaxPercentProcessorTime"]    = SafeGet(vals, idx, "MaxPercentProcessorTime").Trim(),
                 }); break;
-                case "openConn":   rows.Add(new {
-                    OpenConnectionStartTimeUTC = SafeGet(vals, idx, "OpenConnectionStartTimeUTC").Trim(),
-                    RequestId                  = SafeGet(vals, idx, "RequestId").Trim(),
-                    DataSource                 = SafeGet(vals, idx, "DataSource").Trim(),
-                    OpenConnectionDuration_ms  = SafeGet(vals, idx, "OpenConnectionDuration(ms)").Trim(),
-                    Success                    = SafeGet(vals, idx, "Success").Trim(),
-                    ErrorMessage               = SafeGet(vals, idx, "ErrorMessage").Trim(),
+                case "openConn":   rows.Add(new Dictionary<string, string>(StringComparer.Ordinal) {
+                    ["OpenConnectionStartTimeUTC"] = SafeGet(vals, idx, "OpenConnectionStartTimeUTC").Trim(),
+                    ["RequestId"]                  = SafeGet(vals, idx, "RequestId").Trim(),
+                    ["DataSource"]                 = SafeGet(vals, idx, "DataSource").Trim(),
+                    ["OpenConnectionDuration(ms)"] = SafeGet(vals, idx, "OpenConnectionDuration(ms)").Trim(),
+                    ["Success"]                    = SafeGet(vals, idx, "Success").Trim(),
+                    ["ErrorMessage"]               = SafeGet(vals, idx, "ErrorMessage").Trim(),
                 }); break;
             }
         }

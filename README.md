@@ -39,15 +39,20 @@ and performance counters — without uploading anything anywhere.
   to the Errors tab with that message pre-filtered.
 - **Top exception types** — .NET class names ranked by mention count.
 
-### Logs (Errors · Info · Network · Mashup · Installer)
+### Logs (Errors · Info · Network · Mashup · Queries)
 
-- Sortable, searchable tables with Timestamp · Level · Module · Message,
-  plus **Product** and **Connector** columns when Power Platform
-  attribution is available (Power Automate, Logic Apps, Power BI,
-  PowerApps, …).
-- Per-tab badges showing entry counts.
-- Network tab also injects synthesized **port-test** entries inline so
-  connectivity events appear chronologically with real log events.
+- Sortable, searchable tables with Timestamp · Level · Module · Message.
+- The **Errors** tab replaces the Module column with a **Correlation
+  Trace ID** column so failures can be jumped straight into the trace
+  panel (hover shows the full list of correlated IDs).
+- The **Mashup** tab parses both classic `Mashup*.log` files and the
+  NDJSON container logs (`Mashup*.txt`) emitted by the gateway's mashup
+  containers, promoting `Action`, `ActivityId`, `Level` and
+  `ProductVersion` into the usual log shape.
+- Per-tab badges show entry counts.
+- The **Network** tab also injects synthesized **port-test** entries
+  inline so connectivity events appear chronologically with real log
+  events.
 
 ### Queries
 
@@ -55,17 +60,17 @@ and performance counters — without uploading anything anywhere.
   P90 · slowest stats, and a duration bar per row (green / orange / red
   thresholds).
 - Click any query to open a trace panel with status, durations
-  (read / serialization / total), request and tracking IDs, Power
-  Platform root / current activity IDs, and a **Trace in logs** jump.
+  (read / serialization / total), data source URL, request and tracking
+  IDs, and Power Platform root / current activity IDs when present.
 
 ### Power Platform
 
 - Attribution dashboard surfaced when `QueryStartReport_*.log` is
   present in the bundle.
 - Client distribution (PowerAutomate / LogicApps / Power BI Datasets /
-  PowerQueryOnline / PowerApps / Dataflows), connector-type breakdown,
-  and ranked tables of top flows / logic apps / connectors / endpoints
-  by call volume.
+  PowerQueryOnline / PowerApps / Dataflows), a **Sources** breakdown by
+  connector type, and ranked tables of top flows / logic apps /
+  connectors / endpoints by call volume.
 
 ### Performance
 
@@ -113,6 +118,8 @@ and performance counters — without uploading anything anywhere.
 - Dark "Cool Slate" theme with semantic colours for severity.
 - Virtual scrolling on large tables.
 - Multi-state column sorting (asc → desc → unsorted).
+- **Send Feedback** button in the top bar opens the project's GitHub
+  *New Issue* form in the system browser.
 - Keyboard: **Esc** closes Compare; **Ctrl+F** searches within expanded
   config previews.
 

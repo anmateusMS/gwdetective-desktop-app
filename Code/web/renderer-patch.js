@@ -121,7 +121,7 @@
   // We accumulate into a freshly-shaped result and then invoke the page's
   // existing applyParseResult() so all downstream UI code keeps working.
 
-  const LOG_TABS = ['errors', 'info', 'network', 'mashup', 'queries', 'installer'];
+  const LOG_TABS = ['errors', 'info', 'network', 'mashup', 'queries'];
 
   function emptyResult() {
     return {
